@@ -1,6 +1,7 @@
 import os
 import shlex
 
+from primitive_db.constants import DATA_DIR, META_FILE
 from primitive_db.core import (
     create_table,
     delete,
@@ -20,7 +21,6 @@ from primitive_db.utils import (
     save_table_data,
 )
 
-DB_FILE = "db_meta.json"
 
 # --- Замыкание для кэширования (Этап 4) ---
 def create_cacher():
@@ -55,7 +55,7 @@ def run():
     print_help()
 
     while True:
-        metadata = load_metadata(DB_FILE)
+        metadata = load_metadata(META_FILE)  # Используем META_FILE
         
         try:
             user_input = input(">>>Введите команду: ").strip()
@@ -88,8 +88,8 @@ def run():
                     continue
                 success = create_table(metadata, args[1], args[2:])
                 if success:
-                    save_metadata(DB_FILE, metadata)
-                    _query_cache = create_cacher() # Сбрасываем кэш
+                    save_metadata(META_FILE, metadata)  # Используем META_FILE
+                    _query_cache = create_cacher()
                     
             elif command == "drop_table":
                 if len(args) != 2:
@@ -97,10 +97,10 @@ def run():
                     continue
                 success = drop_table(metadata, args[1])
                 if success:
-                    save_metadata(DB_FILE, metadata)
-                    if os.path.exists(f"data/{args[1]}.json"):
-                        os.remove(f"data/{args[1]}.json")
-                    _query_cache = create_cacher() # Сбрасываем кэш
+                    save_metadata(META_FILE, metadata)  # Используем META_FILE
+                    if os.path.exists(f"{DATA_DIR}/{args[1]}.json"):
+                        os.remove(f"{DATA_DIR}/{args[1]}.json")
+                    _query_cache = create_cacher()
                     
             elif command == "list_tables":
                 list_tables(metadata)
@@ -120,7 +120,7 @@ def run():
                     table_data.append(record)
                     save_table_data(table_name, table_data)
                     print(f'Запись с ID={new_id} добавлена в таблицу "{table_name}".')
-                    _query_cache = create_cacher() # Сброс кэша
+                    _query_cache = create_cacher()
                     
             elif command == "select" and len(args) >= 3 and args[1] == "from":
                 table_name = args[2]
@@ -128,14 +128,12 @@ def run():
                 if len(args) > 3 and args[3] == "where":
                     where_clause = parse_where(args[4:])
                 
-                # Формируем уникальный ключ для кэша
                 cache_key = f"{table_name}_{where_clause}"
                 
                 def fetch_data():
                     table_data = load_table_data(table_name)
                     return select(table_data, where_clause)
                 
-                # Используем кэш
                 result = _query_cache(cache_key, fetch_data)
                 
                 if result:
@@ -163,7 +161,7 @@ def run():
                 if count > 0:
                     save_table_data(table_name, table_data)
                     print(f'Запись в таблице "{table_name}" обновлена.')
-                    _query_cache = create_cacher() # Сбрасываем кэш
+                    _query_cache = create_cacher()
                 else:
                     print("Записи для обновления не найдены.")
                     
@@ -175,7 +173,6 @@ def run():
                 where_clause = parse_where(args[4:])
                 table_data = load_table_data(table_name)
                 
-                # Если пользователь отменил удаление, вернется None
                 result = delete(table_data, where_clause)
                 if result is None:
                     continue
@@ -184,7 +181,7 @@ def run():
                 if count > 0:
                     save_table_data(table_name, table_data)
                     print(f'Запись удалена из таблицы "{table_name}".')
-                    _query_cache = create_cacher() # Сбрасываем кэш
+                    _query_cache = create_cacher()
                 else:
                     print("Записи для удаления не найдены.")
                     
