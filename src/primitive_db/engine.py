@@ -22,6 +22,19 @@ from primitive_db.utils import (
 
 DB_FILE = "db_meta.json"
 
+# --- Замыкание для кэширования (Этап 4) ---
+def create_cacher():
+    cache = {}
+    def cache_result(key, value_func):
+        if key not in cache:
+            cache[key] = value_func()
+        return cache[key]
+    return cache_result
+
+# Создаем кэш
+_query_cache = create_cacher()
+
+
 def print_help():
     print("\n***Операции с данными***")
     print("Функции:")
@@ -35,6 +48,7 @@ def print_help():
     print("\nОбщие команды:")
     print("<command> exit - выход из программы")
     print("<command> help - справочная информация\n")
+
 
 def run():
     print("\n***База данных***")
@@ -64,8 +78,10 @@ def run():
             if command == "exit":
                 print("Выход из программы.")
                 break
+                
             elif command == "help":
                 print_help()
+                
             elif command == "create_table":
                 if len(args) < 3:
                     print("Ошибка: Недостаточно аргументов.")
@@ -73,6 +89,8 @@ def run():
                 success = create_table(metadata, args[1], args[2:])
                 if success:
                     save_metadata(DB_FILE, metadata)
+                    _query_cache = create_cacher() # Сбрасываем кэш
+                    
             elif command == "drop_table":
                 if len(args) != 2:
                     print("Ошибка: Использование: drop_table <имя>")
@@ -82,8 +100,11 @@ def run():
                     save_metadata(DB_FILE, metadata)
                     if os.path.exists(f"data/{args[1]}.json"):
                         os.remove(f"data/{args[1]}.json")
+                    _query_cache = create_cacher() # Сбрасываем кэш
+                    
             elif command == "list_tables":
                 list_tables(metadata)
+                
             elif command == "insert" and len(args) >= 5 and args[1] == "into":
                 table_name = args[2]
                 if args[3] != "values":
@@ -99,17 +120,29 @@ def run():
                     table_data.append(record)
                     save_table_data(table_name, table_data)
                     print(f'Запись с ID={new_id} добавлена в таблицу "{table_name}".')
+                    _query_cache = create_cacher() # Сброс кэша
+                    
             elif command == "select" and len(args) >= 3 and args[1] == "from":
                 table_name = args[2]
                 where_clause = None
                 if len(args) > 3 and args[3] == "where":
                     where_clause = parse_where(args[4:])
-                table_data = load_table_data(table_name)
-                result = select(table_data, where_clause)
+                
+                # Формируем уникальный ключ для кэша
+                cache_key = f"{table_name}_{where_clause}"
+                
+                def fetch_data():
+                    table_data = load_table_data(table_name)
+                    return select(table_data, where_clause)
+                
+                # Используем кэш
+                result = _query_cache(cache_key, fetch_data)
+                
                 if result:
                     print_table(metadata, table_name, result)
                 else:
                     print("Записи не найдены.")
+                    
             elif command == "update" and len(args) >= 5:
                 table_name = args[1]
                 if args[2] != "set":
@@ -130,8 +163,10 @@ def run():
                 if count > 0:
                     save_table_data(table_name, table_data)
                     print(f'Запись в таблице "{table_name}" обновлена.')
+                    _query_cache = create_cacher() # Сбрасываем кэш
                 else:
                     print("Записи для обновления не найдены.")
+                    
             elif command == "delete" and len(args) >= 5 and args[1] == "from":
                 table_name = args[2]
                 if args[3] != "where":
@@ -139,18 +174,28 @@ def run():
                     continue
                 where_clause = parse_where(args[4:])
                 table_data = load_table_data(table_name)
-                table_data, count = delete(table_data, where_clause)
+                
+                # Если пользователь отменил удаление, вернется None
+                result = delete(table_data, where_clause)
+                if result is None:
+                    continue
+                    
+                table_data, count = result
                 if count > 0:
                     save_table_data(table_name, table_data)
                     print(f'Запись удалена из таблицы "{table_name}".')
+                    _query_cache = create_cacher() # Сбрасываем кэш
                 else:
                     print("Записи для удаления не найдены.")
+                    
             elif command == "info" and len(args) == 2:
                 table_name = args[1]
                 table_data = load_table_data(table_name)
                 info(metadata, table_name, table_data)
+                
             else:
                 print(f"Функции {command} нет. Попробуйте снова.")
+                
         except ValueError as e:
             print(f"Ошибка в команде: {e}")
         except Exception as e:

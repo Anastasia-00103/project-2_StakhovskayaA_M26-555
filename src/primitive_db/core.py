@@ -1,5 +1,7 @@
 from prettytable import PrettyTable
 
+from primitive_db.decorators import confirm_action, handle_db_errors, log_time
+
 
 def create_table(metadata, table_name, columns):
     if table_name in metadata:
@@ -26,6 +28,8 @@ def create_table(metadata, table_name, columns):
     print(f'Таблица "{table_name}" успешно создана со столбцами: {col_str}')
     return True
 
+@confirm_action("удаление таблицы")
+@handle_db_errors
 def drop_table(metadata, table_name):
     if table_name not in metadata:
         print(f'Ошибка: Таблица "{table_name}" не существует.')
@@ -41,6 +45,8 @@ def list_tables(metadata):
     for table_name in metadata.keys():
         print(f"- {table_name}")
 
+@handle_db_errors
+@log_time
 def insert(metadata, table_name, values):
     if table_name not in metadata:
         print(f'Ошибка: Таблицы "{table_name}" не существует.')
@@ -49,26 +55,28 @@ def insert(metadata, table_name, values):
     if len(values) != len(columns) - 1:
         print(f"Ошибка: Ожидалось {len(columns) - 1} значений, получено {len(values)}.")
         return None
+    
     record = {}
     for i, col in enumerate(columns[1:]):
         val = values[i]
         expected_type = col["type"]
-        try:
-            if expected_type == "int":
-                val = int(val)
-            elif expected_type == "bool":
-                if isinstance(val, str):
-                    val = val.lower() == "true"
-                else:
-                    val = bool(val)
-            elif expected_type == "str":
-                val = str(val)
-        except ValueError:
-            print(f"Ошибка: Некорректное значение '{val}' для столбца '{col['name']}'.")
-            return None
+        
+        # Декоратор handle_db_errors сам поймает ValueError, если int() не сработает
+        if expected_type == "int":
+            val = int(val)
+        elif expected_type == "bool":
+            if isinstance(val, str):
+                val = val.lower() == "true"
+            else:
+                val = bool(val)
+        elif expected_type == "str":
+            val = str(val)
+            
         record[col["name"]] = val
     return record
 
+@handle_db_errors
+@log_time
 def select(table_data, where_clause=None):
     if not where_clause:
         return table_data
@@ -102,7 +110,8 @@ def update(table_data, set_clause, where_clause):
                     row[col] = str(val)
             updated_count += 1
     return table_data, updated_count
-
+@confirm_action("удаление записи из таблицы")
+@handle_db_errors
 def delete(table_data, where_clause):
     if not where_clause:
         print("Ошибка: Удаление без условия WHERE не поддерживается.")
