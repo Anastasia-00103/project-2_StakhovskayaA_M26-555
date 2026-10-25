@@ -1,15 +1,15 @@
 [project]
 name = "primitive-db"
 version = "0.1.0"
-description = "Add your description here"
+description = "Консольная база данных с CRUD-операциями и декораторами"
 readme = "README.md"
 authors = [
     { name = "StakhovskayaAnastasiy", email = "stakhovskaya.anastacia@yandex.ru" }
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "prettytable>=3.18.0",
     "prompt>=0.4.1",
+    "prettytable>=3.18.0",
 ]
 
 [project.scripts]
@@ -23,6 +23,7 @@ build-backend = "uv_build"
 dev = [
     "ruff>=0.17.1",
 ]
+
 [tool.ruff]
 line-length = 88
 target-version = "py312"
