@@ -1,14 +1,16 @@
 from prettytable import PrettyTable
 
+from primitive_db.constants import VALID_TYPES
 from primitive_db.decorators import confirm_action, handle_db_errors, log_time
 
 
 def create_table(metadata, table_name, columns):
+    """Создает новую таблицу с указанными столбцами."""
     if table_name in metadata:
         print(f'Ошибка: Таблица "{table_name}" уже существует.')
         return False
 
-    allowed_types = ["int", "str", "bool"]
+    allowed_types = VALID_TYPES
     parsed_columns = []
     
     for col in columns:
@@ -28,9 +30,11 @@ def create_table(metadata, table_name, columns):
     print(f'Таблица "{table_name}" успешно создана со столбцами: {col_str}')
     return True
 
+
 @confirm_action("удаление таблицы")
 @handle_db_errors
 def drop_table(metadata, table_name):
+    """Удаляет таблицу из базы данных."""
     if table_name not in metadata:
         print(f'Ошибка: Таблица "{table_name}" не существует.')
         return False
@@ -38,16 +42,20 @@ def drop_table(metadata, table_name):
     print(f'Таблица "{table_name}" успешно удалена.')
     return True
 
+
 def list_tables(metadata):
+    """Выводит список всех существующих таблиц."""
     if not metadata:
         print("Список таблиц пуст.")
         return
     for table_name in metadata.keys():
         print(f"- {table_name}")
 
+
 @handle_db_errors
 @log_time
 def insert(metadata, table_name, values):
+    """Добавляет новую запись в таблицу."""
     if table_name not in metadata:
         print(f'Ошибка: Таблицы "{table_name}" не существует.')
         return None
@@ -61,7 +69,6 @@ def insert(metadata, table_name, values):
         val = values[i]
         expected_type = col["type"]
         
-        # Декоратор handle_db_errors сам поймает ValueError, если int() не сработает
         if expected_type == "int":
             val = int(val)
         elif expected_type == "bool":
@@ -75,9 +82,11 @@ def insert(metadata, table_name, values):
         record[col["name"]] = val
     return record
 
+
 @handle_db_errors
 @log_time
 def select(table_data, where_clause=None):
+    """Возвращает записи из таблицы, соответствующие условию."""
     if not where_clause:
         return table_data
     result = []
@@ -91,7 +100,9 @@ def select(table_data, where_clause=None):
             result.append(row)
     return result
 
+
 def update(table_data, set_clause, where_clause):
+    """Обновляет записи в таблице, соответствующие условию."""
     updated_count = 0
     for row in table_data:
         match = True
@@ -110,9 +121,12 @@ def update(table_data, set_clause, where_clause):
                     row[col] = str(val)
             updated_count += 1
     return table_data, updated_count
+
+
 @confirm_action("удаление записи из таблицы")
 @handle_db_errors
 def delete(table_data, where_clause):
+    """Удаляет записи из таблицы, соответствующие условию."""
     if not where_clause:
         print("Ошибка: Удаление без условия WHERE не поддерживается.")
         return table_data, 0
@@ -129,7 +143,9 @@ def delete(table_data, where_clause):
     deleted_count = initial_len - len(result_data)
     return result_data, deleted_count
 
+
 def info(metadata, table_name, table_data):
+    """Выводит информацию о таблице."""
     if table_name not in metadata:
         print(f'Ошибка: Таблицы "{table_name}" не существует.')
         return
@@ -139,7 +155,9 @@ def info(metadata, table_name, table_data):
     print(f"Столбцы: {col_str}")
     print(f"Количество записей: {len(table_data)}")
 
+
 def print_table(metadata, table_name, table_data):
+    """Выводит данные таблицы в красивом табличном формате."""
     cols = metadata[table_name]
     pt = PrettyTable()
     pt.field_names = [c["name"] for c in cols]
